@@ -5,13 +5,13 @@
 ## 界面
 
 ```
-new session-xxx · deepseek-official/deepseek-v4-flash · /Users/spark  ● idle   ← 状态栏
+new session-xxx · deepseek-official/deepseek-v4-flash · /home/user/project  ● idle   ← 状态栏
 ───────────────────────────────────────────────────────────────────────────
 assistant
-    新会话 模型 deepseek-official/deepseek-v4-flash，工作目录 /Users/spark…
+    新会话 模型 deepseek-official/deepseek-v4-flash，工作目录 /home/user/project…
 ───────────────────────────────────────────────────────────────────────────
- 你  用一句话回答：1加1等于几
- assistant
+❯ 用一句话回答：1加1等于几
+ ⏺
     **答案**：2
 ───────────────────────────────────────────────────────────────────────────
 ❯ 输入消息，Enter 发送，/help 查看命令                                       ← 输入框
