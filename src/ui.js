@@ -243,12 +243,14 @@ export class ChatUI {
   }
 
   /**
-   * Append a user message to the transcript.
+   * Append a user message to the transcript (Claude-Code style: `❯` prefix).
    * @param text - the user's submitted text.
    */
   appendUser(text) {
-    const tag = paint(palette.userTag, '你')
-    this.transcript.addChild(new Text(`${tag}  ${paint(palette.userText, text)}`, 1, 0))
+    this.transcript.addChild(new Text(
+      `${paint(palette.userTag, '❯')}  ${paint(palette.userText, text)}`,
+      1, 0,
+    ))
     this.transcript.addChild(new Text('', 0, 0))
     this.tui.requestRender()
   }
@@ -260,8 +262,8 @@ export class ChatUI {
    */
   appendAssistant() {
     let buffer = ''
-    const tag = paint(palette.assistantTag, 'assistant')
-    const body = new Text('', 2, 0)
+    const tag = paint(palette.assistantTag, '⏺')
+    const body = new Text('', 3, 0)
     const msg = new Container()
     msg.addChild(new Text(`${tag}`, 1, 0))
     msg.addChild(body)
@@ -271,7 +273,7 @@ export class ChatUI {
     const handle = {
       update(text) {
         buffer += text
-        const rendered = new Markdown(buffer, 2, 0, mdTheme, {
+        const rendered = new Markdown(buffer, 3, 0, mdTheme, {
           color: (t) => t,
         }).render(120)
         body.setText(rendered.join('\n'))
@@ -287,7 +289,29 @@ export class ChatUI {
   }
 
   /**
-   * Append a tool-call card: one line with the tool name, then the result.
+   * Append a "thinking" indicator while the model reasons (dim, Claude-style
+   * `⏺ Thinking…`). Returns a handle whose `finish` replaces it with the
+   * elapsed duration.
+   * @returns {{ finish(): void }} the indicator handle.
+   */
+  appendThinking() {
+    const line = new Text(`${paint(palette.reasoning, '⏺ Thinking…')}`, 1, 0)
+    this.transcript.addChild(line)
+    const started = Date.now()
+    this.tui.requestRender()
+    const self = this
+    return {
+      finish() {
+        const seconds = Math.max(1, Math.round((Date.now() - started) / 1000))
+        line.setText(`${paint(palette.reasoning, `⏺ Thought for ${seconds}s`)}`)
+        self.tui.requestRender()
+      },
+    }
+  }
+
+  /**
+   * Append a tool-call card (Claude-Code style: `✻` prefix), one line with
+   * the tool name, then the result.
    * @param name - tool name.
    * @param args - raw arguments JSON.
    * @returns a handle whose `result` method sets the outcome line.
@@ -295,7 +319,7 @@ export class ChatUI {
   appendTool(name, args) {
     const msg = new Container()
     msg.addChild(new Text(
-      paint(palette.toolName, `⚙ ${name}(${args})`),
+      paint(palette.toolName, `✻ ${name}(${args})`),
       2, 0,
     ))
     this.transcript.addChild(msg)
@@ -305,8 +329,8 @@ export class ChatUI {
       result(ok) {
         msg.addChild(new Text(
           ok
-            ? paint(palette.toolOk, '  └ ok')
-            : paint(palette.toolErr, '  └ error'),
+            ? paint(palette.toolOk, '  ✔ ok')
+            : paint(palette.toolErr, '  ✖ error'),
           3, 0,
         ))
         self.tui.requestRender()

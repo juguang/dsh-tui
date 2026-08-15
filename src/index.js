@@ -152,15 +152,31 @@ async function run(ctx, config, exit) {
     // Streaming renderer: attach after the message is created.
     ui.appendUser(text)
     const stream = ui.appendAssistant()
+    let thinking
     const detach = ctx.on('session/event', (_session, event) => {
       switch (event.type) {
         case 'assistant/chunk':
-          if (event.data.chunk.type === 'text-delta') stream.update(event.data.chunk.text)
+          switch (event.data.chunk.type) {
+            case 'reasoning-delta':
+              thinking ??= ui.appendThinking()
+              break
+            case 'text-delta':
+              thinking?.finish()
+              thinking = undefined
+              stream.update(event.data.chunk.text)
+              break
+            default:
+              break
+          }
           break
         case 'assistant/message':
+          thinking?.finish()
+          thinking = undefined
           stream.finish()
           break
         case 'tool/call':
+          thinking?.finish()
+          thinking = undefined
           ui.appendTool(event.data.name, event.data.arguments)
           break
         default:
