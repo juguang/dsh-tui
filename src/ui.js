@@ -355,8 +355,13 @@ export class ChatUI {
     panel.addChild(title)
     panel.addChild(body)
     this.reasoningOverlay = this.tui.showOverlay(panel, {
-      maxHeight: '60%',
+      // Anchor to the top so a long reasoning body grows downward from the
+      // top edge; reserve the bottom margin for the editor, which stays
+      // visible and focused while the overlay is open.
+      anchor: 'top-center',
+      maxHeight: '50%',
       maxWidth: '80%',
+      margin: { bottom: 6 },
       nonCapturing: true,
     })
     // Belt and braces: keep keyboard focus on the editor while the overlay
