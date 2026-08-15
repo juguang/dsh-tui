@@ -185,6 +185,10 @@ export class ChatUI {
     // Ctrl+C ladder: running -> cancel; idle -> arm exit (second press exits).
     let exitArmed = false
     this.tui.addInputListener((data) => {
+      if (matchesKey(data, 'ctrl+o')) {
+        this.toggleReasoning()
+        return
+      }
       if (!matchesKey(data, 'ctrl+c')) return
       if (this.status === 'running') {
         this.opts.onInterrupt?.()
@@ -204,6 +208,12 @@ export class ChatUI {
 
   /** Pending transient status flash, rendered with the header. */
   flash
+
+  /** Captured reasoning text of the latest thinking block (for ctrl+o). */
+  reasoning
+
+  /** The reasoning overlay handle, when open. */
+  reasoningOverlay
 
   /**
    * Render the header bar for the current status.
@@ -290,23 +300,61 @@ export class ChatUI {
 
   /**
    * Append a "thinking" indicator while the model reasons (dim, Claude-style
-   * `⏺ Thinking…`). Returns a handle whose `finish` replaces it with the
-   * elapsed duration.
-   * @returns {{ finish(): void }} the indicator handle.
+   * `⏺ Thinking…`). The handle accumulates reasoning text; `finish` replaces
+   * the indicator with the elapsed duration and, when reasoning was captured,
+   * a `(ctrl+o to expand)` hint that opens an overlay.
+   * @returns {{ add(text): handle, finish(): handle }} the thinking handle.
    */
   appendThinking() {
     const line = new Text(`${paint(palette.reasoning, '⏺ Thinking…')}`, 1, 0)
     this.transcript.addChild(line)
     const started = Date.now()
-    this.tui.requestRender()
+    let reasoning = ''
     const self = this
-    return {
+    const handle = {
+      add(text) {
+        reasoning += text
+        return handle
+      },
       finish() {
         const seconds = Math.max(1, Math.round((Date.now() - started) / 1000))
-        line.setText(`${paint(palette.reasoning, `⏺ Thought for ${seconds}s`)}`)
+        const hint = reasoning.trim() !== ''
+          ? `⏺ Thought for ${seconds}s (${paint(palette.reasoning, 'ctrl+o')} to expand)`
+          : `⏺ Thought for ${seconds}s`
+        line.setText(paint(palette.reasoning, hint))
+        self.reasoning = reasoning
+        self.reasoningLine = line
         self.tui.requestRender()
+        return handle
       },
     }
+    return handle
+  }
+
+  /**
+   * Toggle the reasoning overlay: open (or refresh) on the first ctrl+o,
+   * close on the second. The overlay shows the captured reasoning text.
+   */
+  toggleReasoning() {
+    if (this.reasoningOverlay !== undefined) {
+      this.reasoningOverlay.hide()
+      this.reasoningOverlay = undefined
+      this.tui.requestRender()
+      return
+    }
+    const reasoning = this.reasoning ?? ''
+    if (reasoning.trim() === '') return
+    const title = new Text(paint(palette.reasoning, '⏺ reasoning'), 1, 1)
+    const body = new Text('', 2, 0)
+    body.setText(new Markdown(reasoning, 2, 0, mdTheme, { color: (t) => t }).render(100).join('\n'))
+    const panel = new Container()
+    panel.addChild(title)
+    panel.addChild(body)
+    this.reasoningOverlay = this.tui.showOverlay(panel, {
+      maxHeight: '60%',
+      maxWidth: '80%',
+    })
+    this.tui.requestRender()
   }
 
   /**

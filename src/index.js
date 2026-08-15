@@ -159,6 +159,7 @@ async function run(ctx, config, exit) {
           switch (event.data.chunk.type) {
             case 'reasoning-delta':
               thinking ??= ui.appendThinking()
+              thinking.add(event.data.chunk.text)
               break
             case 'text-delta':
               thinking?.finish()
