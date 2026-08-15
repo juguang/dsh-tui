@@ -1,7 +1,7 @@
 {
   "name": "dsh-tui",
   "version": "0.1.0",
-  "description": "A minimal interactive terminal UI for dsh: readline loop + streaming assistant output, zero UI dependencies.",
+  "description": "An interactive terminal UI for dsh: differential-rendered chat interface with markdown, tool cards, session listing, and terminal approval.",
   "type": "module",
   "main": "./src/index.js",
   "exports": {
@@ -20,9 +20,14 @@
     "src/markdown.js",
     "src/sessions.js",
     "src/approval.js",
+    "src/theme.js",
+    "src/ui.js",
     "cordis.patch.yml",
     "README.md"
   ],
+  "dependencies": {
+    "@earendil-works/pi-tui": "^0.84.2"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

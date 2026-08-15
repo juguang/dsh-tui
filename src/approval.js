@@ -1,25 +1,24 @@
 /**
  * Terminal approval answerer: listens to the `approval/request` waterfall for
- * this agent and prompts on the terminal. Returns `'allowed-once'` on y/yes,
- * `'rejected'` otherwise (fail closed).
+ * this agent and prompts inside the chat screen. Returns `'allowed-once'` on
+ * y/yes, `'rejected'` otherwise (fail closed).
+ *
+ * Interaction model with the pi-tui chat UI: when an approval is requested,
+ * we append a "pending approval" card to the transcript and hand the editor
+ * to the approval flow — the next submitted line is the y/n answer, after
+ * which the editor returns to normal input.
  *
  * @module dsh-tui/approval
  */
-
-const C = {
-  reset: '\x1b[0m',
-  yellow: '\x1b[33m',
-  dim: '\x1b[2m',
-}
 
 /**
  * Register the terminal approval answerer for one agent.
  * @param ctx - settled application context.
  * @param agent - the agent whose tool calls we answer for.
- * @param rl - the active readline interface (paused while a turn runs).
+ * @param ui - the ChatUI instance (transcript + editor).
  * @returns the exact disposer for the event listener.
  */
-export function installApprovalAnswerer(ctx, agent, rl) {
+export function installApprovalAnswerer(ctx, agent, ui) {
   return ctx.on('approval/request', (req, next) => {
     // Answer only for the agent this TUI drives; delegate everything else.
     if (req.agent !== agent) return next()
@@ -28,21 +27,34 @@ export function installApprovalAnswerer(ctx, agent, rl) {
     if (signal?.aborted) return 'cancelled'
 
     return new Promise((resolve) => {
-      process.stdout.write(
-        `\n${C.yellow}⚑ ${req.toolName}${C.reset}${req.reason !== undefined ? ` — ${req.reason}` : ''}\n`,
+      const card = ui.appendAssistant()
+      card.update(
+        `⚑ **需要批准** — 工具 \`${req.toolName}\`${req.reason !== undefined ? `\n\n${req.reason}` : ''}\n\n在下方输入 \`y\` 允许（本次），\`n\` 拒绝。`,
       )
+
       const onAbort = () => {
-        resolve('cancelled')
+        finish('cancelled')
       }
       signal?.addEventListener('abort', onAbort, { once: true })
-      // rl.question temporarily takes over the interface; the line handler
-      // is paused while a turn runs, so this cannot interleave with it.
-      rl.question(`${C.yellow}[y/n] ${C.reset}`, (answer) => {
+
+      // Take over the editor for the y/n answer.
+      const originalSubmit = ui.editor.onSubmit
+      ui.editor.onSubmit = (text) => {
+        ui.editor.onSubmit = originalSubmit
+        ui.editor.setText('')
+        const a = text.trim().toLowerCase()
+        finish(a === 'y' || a === 'yes' ? 'allowed-once' : 'rejected')
+      }
+      ui.focusEditor()
+
+      function finish(outcome) {
         signal?.removeEventListener('abort', onAbort)
-        const a = answer.trim().toLowerCase()
-        process.stdout.write(`${C.dim}${a === 'y' || a === 'yes' ? '→ allowed' : '→ rejected'}${C.reset}\n`)
-        resolve(a === 'y' || a === 'yes' ? 'allowed-once' : 'rejected')
-      })
+        card.finish()
+        ui.appendAssistant().update(
+          outcome === 'allowed-once' ? '**已批准** ✓' : outcome === 'cancelled' ? '**已取消**' : '**已拒绝** ✗',
+        ).finish()
+        resolve(outcome)
+      }
     })
   })
 }
