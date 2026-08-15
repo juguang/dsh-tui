@@ -179,6 +179,9 @@ async function run(ctx, config, exit) {
           thinking = undefined
           ui.appendTool(event.data.name, event.data.arguments)
           break
+        case 'todo/write':
+          ui.setTodo(event.data.todos)
+          break
         default:
           break
       }

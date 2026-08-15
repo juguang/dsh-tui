@@ -338,6 +338,50 @@ export class ChatUI {
     }
   }
 
+  /**
+   * Render the agent's todo list (Claude-Code style: `◼`/`✔`/`○` markers and
+   * a summary line). The todo/write event is a whole-list snapshot, so this
+   * REPLACES the previous todo block.
+   * @param todos - the current TodoItem list from the session event.
+   */
+  setTodo(todos) {
+    // Replace the previous todo block (keep one slot per snapshot).
+    if (this.todoBlock !== undefined) {
+      this.transcript.removeChild(this.todoBlock)
+    }
+    const block = new Container()
+    const summary = {
+      completed: 0,
+      inProgress: 0,
+      pending: 0,
+    }
+    for (const item of todos) {
+      if (item.status === 'completed') summary.completed += 1
+      else if (item.status === 'in_progress') summary.inProgress += 1
+      else summary.pending += 1
+    }
+    const count = todos.length
+    const open = summary.inProgress + summary.pending
+    block.addChild(new Text(
+      paint(palette.toolBody, `${count} tasks (${summary.completed} done, ${summary.inProgress} in progress, ${open} open)`),
+      2, 0,
+    ))
+    for (const item of todos) {
+      const marker = item.status === 'completed'
+        ? paint(palette.toolOk, '✔')
+        : item.status === 'in_progress'
+          ? paint(palette.statusWarn, '◼')
+          : paint(palette.toolBody, '○')
+      const text = item.status === 'completed'
+        ? paint(palette.toolBody, item.content)
+        : item.content
+      block.addChild(new Text(`  ${marker}  ${text}`, 3, 0))
+    }
+    this.transcript.addChild(block)
+    this.todoBlock = block
+    this.tui.requestRender()
+  }
+
   /** Append a divider line to the transcript. */
   divider() {
     this.transcript.addChild(new Text(paint(palette.divider, '─'.repeat(40)), 1, 0))
