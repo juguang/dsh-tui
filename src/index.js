@@ -6,6 +6,11 @@
  * then run a readline loop: user input -> agent.followup() -> wait for idle
  * -> prompt again. `/exit` (or Ctrl+C twice) shuts the tree down.
  *
+ * Features:
+ * - markdown rendering (headings/bold/italic/code/lists/fenced blocks)
+ * - `/sessions` and `--list`: list persisted sessions, pick one to resume
+ * - terminal approval: `approval/request` asks [y/n] inline for tool calls
+ *
  * Deliberately zero-dependency on the UI side: node:readline + ANSI colors.
  * dsh runtime deps are imported dynamically so the tarball stays installable
  * without a registry round-trip for private rc packages.
@@ -17,6 +22,10 @@ import { createInterface } from 'node:readline'
 
 const { createUserMessage } = await import('@deepseek-ai/dsh-llm')
 const { SessionId } = await import('@deepseek-ai/dsh-session')
+
+import { MarkdownRenderer } from './markdown.js'
+import { listSessions, resolveSelection } from './sessions.js'
+import { installApprovalAnswerer } from './approval.js'
 
 /** Stable Cordis plugin name. */
 export const name = 'tui-runner'
@@ -39,7 +48,7 @@ const C = {
  * Apply the TUI: drive one agent/session through an interactive readline loop
  * until the user exits. Blocks the process via the provided exit request.
  * @param ctx - plugin context carrying core services and the launcher exit.
- * @param config - resolved runner config (resume id when provided).
+ * @param config - resolved runner config (resume id / list flag).
  */
 export function apply(ctx, config) {
   const exit = ctx.get('appExit')
@@ -66,6 +75,16 @@ async function run(ctx, config, exit) {
   const defaultModel = ctx.get('agentDefaultModel')
   if (agents === undefined || sessions === undefined || defaultModel === undefined) return
 
+  // `--list`: print persisted sessions and exit without an interactive loop.
+  if (config.list === true) {
+    const index = await listSessions(ctx)
+    if (index.size > 0) {
+      process.stdout.write(`${C.dim}resume one with: dsh --profile tui --resume <id>${C.reset}\n`)
+    }
+    exit(index.size > 0 ? 0 : 1)
+    return
+  }
+
   const selection = defaultModel.currentSelection()
   let agent
   if (config.resume !== undefined) {
@@ -85,13 +104,15 @@ async function run(ctx, config, exit) {
     process.stdout.write(`${C.dim}new session ${created.session.id}${C.reset}\n`)
   }
 
-  // Streaming renderer: assistant chunks print inline as they arrive.
+  // Streaming renderer: assistant chunks print inline as they arrive,
+  // styled through the markdown renderer.
+  const md = new MarkdownRenderer()
   const unsubscribe = ctx.on('session/event', (_session, event) => {
     switch (event.type) {
       case 'assistant/chunk':
         switch (event.data.chunk.type) {
           case 'text-delta':
-            process.stdout.write(event.data.chunk.text)
+            md.push(event.data.chunk.text)
             break
           case 'reasoning-delta':
             process.stdout.write(`${C.dim}${event.data.chunk.text}${C.reset}`)
@@ -101,6 +122,7 @@ async function run(ctx, config, exit) {
         }
         break
       case 'assistant/message':
+        md.flush()
         process.stdout.write('\n')
         break
       case 'tool/call':
@@ -125,6 +147,10 @@ async function run(ctx, config, exit) {
     output: process.stdout,
     prompt: `${C.green}❯${C.reset} `,
   })
+
+  // Terminal approval: [y/n] prompts for tool calls that require approval.
+  const disposeApproval = installApprovalAnswerer(ctx, agent, rl)
+  void disposeApproval
 
   // Ctrl+C: first cancels an in-flight turn, second exits.
   let ctrlCPressed = false
@@ -159,7 +185,23 @@ async function run(ctx, config, exit) {
       return
     }
     if (text === '/help') {
-      process.stdout.write(`${C.dim}/exit 退出 | Ctrl+C 取消当前回合（连按两次退出）${C.reset}\n`)
+      process.stdout.write(`${C.dim}/exit 退出 | /sessions 列出会话 | Ctrl+C 取消当前回合（连按两次退出）${C.reset}\n`)
+      rl.prompt()
+      return
+    }
+    if (text === '/sessions' || text.startsWith('/sessions ')) {
+      const index = await listSessions(ctx)
+      if (index.size > 0) {
+        const selectionText = text.replace('/sessions', '').trim()
+        if (selectionText !== '') {
+          const id = resolveSelection(selectionText, index)
+          if (id === undefined) {
+            process.stdout.write(`${C.red}✗ 无效选择，输入 /sessions <序号>${C.reset}\n`)
+          } else {
+            process.stdout.write(`${C.dim}resume with: dsh --profile tui --resume ${id}${C.reset}\n`)
+          }
+        }
+      }
       rl.prompt()
       return
     }

@@ -14,3 +14,4 @@
       inject: [tuiStartup]
       config:
         resume: !!js ctx.tuiStartup.resume
+        list: !!js ctx.tuiStartup.list

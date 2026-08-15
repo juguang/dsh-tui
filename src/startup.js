@@ -29,15 +29,18 @@ export function apply(ctx) {
     .description('An interactive terminal UI for dsh.')
     .helpOption('-h, --help', 'show this help')
     .option('--resume <sessionId>', 'resume an existing session instead of starting a new one')
+    .option('--list', 'list persisted sessions and exit (no interactive loop)')
     .addHelpText('after', `
 Examples:
   dsh --profile tui                       start a new interactive session
   dsh --profile tui --resume <id>         resume a previous session
+  dsh --profile tui --list                list persisted sessions and exit
 `)
   program.action(() => {
     const opts = program.opts()
     ctx.provide(TUI_STARTUP_SERVICE, {
       ...(opts.resume !== undefined ? { resume: opts.resume } : {}),
+      ...(opts.list === true ? { list: true } : {}),
     })
   })
   parseCmdline(ctx, program)

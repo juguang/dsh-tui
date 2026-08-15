@@ -17,6 +17,9 @@
   "files": [
     "src/index.js",
     "src/startup.js",
+    "src/markdown.js",
+    "src/sessions.js",
+    "src/approval.js",
     "cordis.patch.yml",
     "README.md"
   ],
