@@ -185,9 +185,10 @@ export class ChatUI {
     // Ctrl+C ladder: running -> cancel; idle -> arm exit (second press exits).
     let exitArmed = false
     this.tui.addInputListener((data) => {
+      // Consume ctrl+o so it never reaches the editor as a character.
       if (matchesKey(data, 'ctrl+o')) {
         this.toggleReasoning()
-        return
+        return { consume: true }
       }
       if (!matchesKey(data, 'ctrl+c')) return
       if (this.status === 'running') {
@@ -332,13 +333,16 @@ export class ChatUI {
   }
 
   /**
-   * Toggle the reasoning overlay: open (or refresh) on the first ctrl+o,
-   * close on the second. The overlay shows the captured reasoning text.
+   * Toggle the reasoning overlay: open on the first ctrl+o, close on the
+   * second. `nonCapturing` keeps keyboard focus on the editor while the
+   * overlay is open; closing restores focus explicitly so typing works
+   * immediately after.
    */
   toggleReasoning() {
     if (this.reasoningOverlay !== undefined) {
       this.reasoningOverlay.hide()
       this.reasoningOverlay = undefined
+      this.tui.setFocus(this.editor)
       this.tui.requestRender()
       return
     }
@@ -353,7 +357,11 @@ export class ChatUI {
     this.reasoningOverlay = this.tui.showOverlay(panel, {
       maxHeight: '60%',
       maxWidth: '80%',
+      nonCapturing: true,
     })
+    // Belt and braces: keep keyboard focus on the editor while the overlay
+    // is open, so typing is never swallowed by the display-only overlay.
+    this.tui.setFocus(this.editor)
     this.tui.requestRender()
   }
 
