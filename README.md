@@ -30,10 +30,24 @@ assistant
 
 ## 安装
 
+**方式一：从 GitHub 直接安装（推荐，无需构建）**
+
+本插件是纯 JS、零构建步骤，git 安装不需要 `prepare` 脚本或 pnpm `allowBuilds` 白名单：
+
+```sh
+dsh plugin --profile tui add -w github:juguang/dsh-tui
+```
+
+**方式二：从 tarball / 本地安装**
+
 ```sh
 cd dsh-tui && pnpm pack
-dsh plugin --profile tui add -w ./dsh-tui-0.1.0.tgz
+dsh plugin --profile tui add -w ./dsh-tui-0.1.1.tgz
+# 或从本地目录
+dsh plugin --profile tui add -w ./dsh-tui
 ```
+
+（注：profile 自带 `pnpm-workspace.yaml` 是 workspace root，`add` 需显式 `-w`；npm 发布后可改为 `dsh plugin add -w dsh-tui`。）
 
 ## 启动
 
