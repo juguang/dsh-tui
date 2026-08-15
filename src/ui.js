@@ -22,6 +22,7 @@ import {
   ProcessTerminal,
   Text,
   TuiMainScreen,
+  isKeyRelease,
   matchesKey,
   stripTerminalSequences,
   visibleWidth,
@@ -184,10 +185,23 @@ export class ChatUI {
 
     // Ctrl+C ladder: running -> cancel; idle -> arm exit (second press exits).
     let exitArmed = false
+    // Debounce ctrl+o: iTerm2 with the Kitty protocol can emit press/release
+    // (and repeat) pairs for one physical press; toggling on every event would
+    // open and immediately close the overlay. Ignore ctrl+o for a short window
+    // after the last accepted one.
+    let lastCtrlO = 0
     this.tui.addInputListener((data) => {
+      // Skip key-release events: terminals emit keydown + keyup, and without
+      // this filter a single ctrl+o press would toggle the overlay open and
+      // then immediately closed ("flash").
+      if (isKeyRelease(data)) return
       // Consume ctrl+o so it never reaches the editor as a character.
       if (matchesKey(data, 'ctrl+o')) {
-        this.toggleReasoning()
+        const now = Date.now()
+        if (now - lastCtrlO >= 300) {
+          lastCtrlO = now
+          this.toggleReasoning()
+        }
         return { consume: true }
       }
       if (!matchesKey(data, 'ctrl+c')) return
