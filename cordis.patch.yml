@@ -1,0 +1,16 @@
+# dsh-tui bundle patch: an interactive terminal UI riding over dsh-base.
+# Two rows, mirroring the headless bundle's split:
+#   tui-startup parses this app's own command line (--resume) and provides the
+#   parsed values as the `tuiStartup` service;
+#   tui-runner consumes that service and owns the readline loop, the agent
+#   session, and the streaming renderer.
+
+- insert:
+    - id: tui-startup
+      name: 'dsh-tui/startup'
+
+    - id: tui-runner
+      name: 'dsh-tui'
+      inject: [tuiStartup]
+      config:
+        resume: !!js ctx.tuiStartup.resume

@@ -1,0 +1,9 @@
+# Build artifacts
+*.tgz
+
+# Dependencies (symlink to the dsh installation's healed fallback)
+
+# Editor / OS
+.DS_Store
+*.log
+node_modules
